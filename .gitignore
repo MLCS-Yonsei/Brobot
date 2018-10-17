@@ -1,0 +1,13 @@
+/bin/age_gender/results/*
+
+.DS_Store
+*.pyc
+*/__pycache__
+graph_opt.pb
+
+*.pyc
+
+.eggs
+build
+*.egg
+pcars.egg-info
