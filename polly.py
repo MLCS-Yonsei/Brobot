@@ -8,6 +8,7 @@ from tempfile import gettempdir
 
 from mutagen.mp3 import MP3
 from math import ceil
+from time import sleep
 
 def play_with_polly(text):
     # Create a client using the credentials and region defined in the [adminuser]
@@ -65,7 +66,8 @@ def play_with_polly(text):
         subprocess.call([opener, output])
 
     audio = MP3(output)
-    return ceil(audio.info.length)
+    _play_time = ceil(audio.info.length)
+    sleep(_play_time)
 
 r = play_with_polly("빨간 옷이 참 잘어울리시네요")
 print("Play time : ", r)
