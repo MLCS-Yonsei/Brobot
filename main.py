@@ -186,7 +186,7 @@ with detection_graph.as_default():
 import cv2
 import time
 
-CAM_ID = 1
+CAM_ID = 0
 cam = cv2.VideoCapture(CAM_ID)
 
 if cam.isOpened() == False:
@@ -215,6 +215,7 @@ prevTime = 0
 import socket
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect(("192.168.0.23", 8250))
+robot_movement_time = None
 
 with detection_graph.as_default():
     with tf.Session(graph=detection_graph) as sess:
@@ -232,7 +233,7 @@ with detection_graph.as_default():
             image_process, track_results = detect_objects(frame, sess, detection_graph, mot_tracker, deep_tracker, r, img_to_color)
 
             if len(track_results) > 0:
-                robotControl(client_socket, track_results)
+                robot_movement_time = robotControl(client_socket, track_results, robot_movement_time)
 
 
 
