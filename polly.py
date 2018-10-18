@@ -54,7 +54,7 @@ def play_with_polly(text):
             except IOError as error:
                 # Could not write to file, exit gracefully
                 print(error)
-                sys.exit(-1)
+                # sys.exit(-1)
 
     else:
         # The response didn't contain audio data, exit gracefully
