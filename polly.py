@@ -8,7 +8,7 @@ from tempfile import gettempdir
 
 from mutagen.mp3 import MP3
 from math import ceil
-from time import sleep
+from time import sleep, time
 
 import json
 import datetime
@@ -46,7 +46,7 @@ def play_with_polly(text):
         # ensure the close method of the stream object will be called automatically
         # at the end of the with statement's scope.
         with closing(response["AudioStream"]) as stream:
-            output = os.path.join(gettempdir(), str(datetime.datetime.now()) + "speech.mp3")
+            output = os.path.join(gettempdir(), str(ceil(time())) + "speech.mp3")
             
             try:
                 # Open a file for writing the output as a binary stream
