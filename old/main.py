@@ -2,23 +2,20 @@ import sys
 import os
 import numpy as np
 import tensorflow as tf
-
+from matplotlib import pyplot as plt
 from PIL import Image
 from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
 
 from bin.sort.sort import *
-from bin.deep_sort.multiple import Deep_Sort
 from bin.color_extractor.color_extractor import ImageToColor
 
-import atexit
+from controllers.ageGenderController import *
 
-import time
+from multiprocessing import Process, Queue, Pipe
 
-import socket
-import redis
-r = redis.StrictRedis(host='redis.hwanmoo.kr', port=6379, db=0)
-
+sys.path.insert(0, './bin/age_gender')
+from age_gender_main import *
 
 CWD_PATH = os.getcwd()
 
@@ -38,7 +35,7 @@ categories = label_map_util.convert_label_map_to_categories(label_map, max_num_c
                                                             use_display_name=True)
 category_index = label_map_util.create_category_index(categories)
 
-def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r, img_to_color):
+def detect_objects(image_np, sess, detection_graph, mot_tracker, img_to_color, face_detect, face_queue, gender_queue, age_queue):
     # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
     image_np_expanded = np.expand_dims(image_np, axis=0)
     image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
@@ -56,54 +53,21 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
     (boxes, scores, classes, num_detections) = sess.run(
         [boxes, scores, classes, num_detections],
         feed_dict={image_tensor: image_np_expanded})
+
     
-    img_height = image_np.shape[0]
-    img_width = image_np.shape[1]
-
-    min_score_thresh = 0.5
-
-    track_boxes = []
-    track_objs = []
-    person_ids = []
-    _person_ids = [i for i, e in enumerate(classes[0]) if e == 1]
-    person_boxes = []
-    person_scores = []
-    person_classes = []
-    for p_id in _person_ids:
-        if scores[0][p_id] > min_score_thresh:
-            person_ids.append(p_id)
-            person_box = boxes[0][p_id]
-            person_boxes.append(person_box)
-
-            person_classes.append(1)
-
-            person_score = scores[0][p_id]
-            person_scores.append(person_score)
-            _track_box = [person_box[1]*img_width, person_box[0]*img_height, person_box[3]*img_width, person_box[2]*img_height]
-
-            track_boxes.append(_track_box)
-
-            _track_obj = {
-                'topleft': {
-                    'x': person_box[1]*img_width,
-                    'y': person_box[0]*img_height
-                },
-                'bottomright': {
-                    'x': person_box[3]*img_width,
-                    'y': person_box[2]*img_height
-                },
-                'confidence': person_score
-            }
-            track_objs.append(_track_obj)
     
-    # trackers = mot_tracker.update(np.asarray(track_boxes))
-    trackers = deep_tracker.track(track_objs, image_np)
-    # print("trackers: ", trackers)
-    # print("person ids", person_ids)
-    if len(trackers) > 0 and len(trackers) == len(person_ids):
-        # 북서남동
-        print("person ids", person_ids)
-        # print(person_tracker[4])
+    person_ids = [i for i, e in enumerate(classes[0]) if e == 1]
+
+    if len(person_ids) > 0:
+        selected_person_id = person_ids[0]
+        
+        person_box = boxes[0][selected_person_id]
+        person_score = scores[0][selected_person_id]
+        print(person_box)
+        trackers = mot_tracker.update(np.expand_dims(person_box, axis=0))
+        
+        person_tracker = trackers[0]
+
         def crop_img(img,box):
             y,x,d = img.shape
             startx = int(x*box[0])
@@ -113,55 +77,91 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
 
             return img[starty:endy,startx:endx]
 
-        person_attrs = []
-        for idx, person_id in enumerate(person_ids):
+        def get_color(q, img):
             try:
-                person_box = person_boxes[idx]
+                start_time = time.monotonic()
+                
+                c = img_to_color.get(img)
+                q.put({"flag":"color","value":c})
 
-                person_img = crop_img(image_np,person_box)
-                # c = img_to_color.get(person_img)
+                elapsed_time = time.monotonic() - start_time
+                print("Color", elapsed_time)
             except:
-                pass
-            c = 'NA'
+                q.put({"flag":"color","value":False})
 
-            person_attr = {
-                'age':1,
-                'gender':1,
-                'color':c
-            }
+
+        def detect_face(q, img, face_detect, face_queue, gender_queue, age_queue):
+
+            start_time = time.monotonic()
+            # your code
             
-            person_attrs.append(person_attr)
+            files = []
+            
+            faces, face_files, rectangles, tgtdir = face_detect.run(img)
+            face_queue.put([face_files, img, tgtdir])
+            face_queue.put([face_files, img, tgtdir])
 
-        # start_time = time.time()
+            person_gender = gender_queue.get()
+            person_age = age_queue.get()
+            print("gender rcvd",person_gender)
+            print("Age rcvd",person_age)
 
-        # elapsed_time = time.time() - start_time
-        # print("ET",elapsed_time)
-        
-        # for r in results:
-        #     person_attr[r['flag']] = r['value']
-        
+            q.put({"flag":"gender","value":person_gender})
+            q.put({"flag":"age","value":person_age})
 
+            elapsed_time = time.monotonic() - start_time
+            print("Age/Gender", elapsed_time)
+
+        person_img = crop_img(image_np,person_box)
+
+        q = Queue()
+        procs = []
+
+        process_color = Process(target=get_color, args=(q, person_img,))
+        procs.append(process_color)
+
+        process_face = Process(target=detect_face, args=(q, person_img, face_detect, face_queue, gender_queue, age_queue))
+        procs.append(process_face)
+
+        for proc in procs:
+            proc.start()
+
+        results = []
+        for proc in procs:
+            results.append(q.get())
+        results.append(q.get())
+
+        for proc in procs:
+            proc.join()
+
+        person_attr = {
+            'age':1,
+            'gender':1,
+            'color':1
+        }
+
+
+        # print(person_attr)
         # override boxes
-        person_boxes = np.asarray(person_boxes)
-        person_scores = np.asarray(person_scores)
-        person_classes = np.asarray(person_classes)
-        print("tracker",trackers)
-        # if len(trackers) == len(person_ids):
-        # print(person_boxes.shape, person_scores.shape, person_classes.shape, trackers.shape)
+        boxes = np.expand_dims(person_box, axis=0)
+        classes = [1]
+        scores = np.expand_dims(person_score, axis=0)
+        trackers = np.expand_dims(person_tracker, axis=0)
+        person_attr = [person_attr]
+
         # Visualization of the results of a detection.
         vis_util.visualize_boxes_and_labels_on_image_array(
             image_np,
-            person_boxes,
-            person_classes,
-            person_scores,
+            boxes,
+            classes,
+            scores,
             trackers,
-            person_attrs,
+            person_attr,
             category_index,
             use_normalized_coordinates=True,
-            line_thickness=3,
-            min_score_thresh=min_score_thresh)
+            line_thickness=3)
 
-    return image_np, trackers
+    return image_np
 
 # First test on images
 PATH_TO_TEST_IMAGES_DIR = 'object_detection/test_images'
@@ -196,45 +196,31 @@ if cam.isOpened() == False:
 cv2.namedWindow('Cam')
 prevTime = 0
 
+face_queue = Queue()
+gender_queue = Queue()
+age_queue = Queue()
 
-# ips = eval(r.hget('subscribers','list'))
-# if ips is None:
-#     ips = [local_ip]
-# else:
-#     if local_ip not in ips:
-#         ips.append(local_ip)
+process_gender = Process(target=gender_estimate, args=(face_queue,gender_queue))
+process_gender.start()
 
-# r.hset('subscribers','list',ips)
-# r.hset('subscribers',local_ip,True)
-
-# def unset_redis_at_exit(r,local_ip):
-#     r.hset('subscribers',local_ip,False)
-
-# atexit.register(unset_redis_at_exit,r=r,local_ip=local_ip)
-
-import socket
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(("192.168.0.23", 8250))
+process_age = Process(target=age_estimate, args=(face_queue,age_queue))
+process_age.start()
 
 with detection_graph.as_default():
     with tf.Session(graph=detection_graph) as sess:
         # Load modules
         mot_tracker = Sort() 
-        deep_tracker = Deep_Sort()
 
         npz = np.load('bin/color_extractor/color_names.npz')
         img_to_color = ImageToColor(npz['samples'], npz['labels'])
+
+        face_detect = face_detection_model('dlib', './bin/age_gender/Model/shape_predictor_68_face_landmarks.dat')
 
         while (True):
             ret, frame = cam.read()
             
             # Detection
-            image_process, track_results = detect_objects(frame, sess, detection_graph, mot_tracker, deep_tracker, r, img_to_color)
-
-            if len(track_results) > 0:
-                robotControl(client_socket, track_results)
-
-
+            image_process = detect_objects(frame, sess, detection_graph, mot_tracker, img_to_color, face_detect, face_queue, gender_queue, age_queue)
 
             curTime = time.time()
             sec = curTime - prevTime
@@ -252,8 +238,6 @@ with detection_graph.as_default():
                 cv2.destroyWindow('Cam')
                 break
 
-            
-            
             # plt.figure(figsize=IMAGE_SIZE)
             # plt.imshow(image_process)
             # plt.show()

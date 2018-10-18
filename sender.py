@@ -16,7 +16,7 @@ while True:
         
         if text == 'quit':
             break
-            
+
         querystring = {"text":text}
 
         headers = {
@@ -24,4 +24,3 @@ while True:
             }
 
         response = requests.request("GET", url, headers=headers, params=querystring)
-
