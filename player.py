@@ -85,11 +85,8 @@ def polly():
     text = request.args.get('text')
     print("RCVD Text:",text)
     try:
-        r = play_with_polly(text)
-        print(r)
-        if r is not False:
-            _v = AudioSegment.from_mp3(r)
-            play(_v)
+        play_with_polly(text)
+        
         return jsonify({'status':True}), 200
     except Exception as ex:
         return jsonify({'status':False,'msg':str(ex)}), 500
