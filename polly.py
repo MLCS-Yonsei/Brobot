@@ -6,6 +6,9 @@ import sys
 import subprocess
 from tempfile import gettempdir
 
+from mutagen.mp3 import MP3
+from math import ceil
+
 def play_with_polly(text):
     # Create a client using the credentials and region defined in the [adminuser]
     # section of the AWS credentials file (~/.aws/credentials).
@@ -38,7 +41,7 @@ def play_with_polly(text):
         # at the end of the with statement's scope.
         with closing(response["AudioStream"]) as stream:
             output = os.path.join(gettempdir(), "speech.mp3")
-
+            
             try:
                 # Open a file for writing the output as a binary stream
                 with open(output, "wb") as file:
@@ -61,4 +64,8 @@ def play_with_polly(text):
         opener = "open" if sys.platform == "darwin" else "xdg-open"
         subprocess.call([opener, output])
 
-play_with_polly("빨간 옷이 참 잘어울리시네요")
+    audio = MP3(output)
+    return ceil(audio.info.length)
+
+r = play_with_polly("빨간 옷이 참 잘어울리시네요")
+print("Play time : ", r)

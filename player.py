@@ -85,7 +85,8 @@ def polly():
     text = request.args.get('text')
     print("RCVD Text:",text)
     try:
-        play_with_polly(text)
+        _play_time = play_with_polly(text)
+        sleep(_play_time)
         return jsonify({'status':True}), 200
     except Exception as ex:
         return jsonify({'status':False,'msg':str(ex)}), 500
