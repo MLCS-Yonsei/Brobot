@@ -11,6 +11,7 @@ from math import ceil
 from time import sleep
 
 import json
+import datetime
 with open('./AWS_key.json') as f:
     aws_key = json.load(f)
 
@@ -45,7 +46,7 @@ def play_with_polly(text):
         # ensure the close method of the stream object will be called automatically
         # at the end of the with statement's scope.
         with closing(response["AudioStream"]) as stream:
-            output = os.path.join(gettempdir(), "speech.mp3")
+            output = os.path.join(gettempdir(), str(datetime.datetime.now()) + "speech.mp3")
             
             try:
                 # Open a file for writing the output as a binary stream
@@ -70,9 +71,9 @@ def play_with_polly(text):
         opener = "open" if sys.platform == "darwin" else "xdg-open"
         subprocess.call([opener, output])
 
-    audio = MP3(output)
-    _play_time = ceil(audio.info.length)
-    sleep(_play_time)
+    # audio = MP3(output)
+    # _play_time = ceil(audio.info.length)
+    # sleep(_play_time)
 
 if __name__ == '__main__':
     r = play_with_polly("빨간 옷이 참 잘어울리시네요")
