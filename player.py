@@ -86,6 +86,7 @@ def polly():
     print("RCVD Text:",text)
     try:
         r = play_with_polly(text)
+        print(r)
         if r is not False:
             _v = AudioSegment.from_mp3(r)
             play(_v)
