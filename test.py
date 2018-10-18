@@ -2,7 +2,7 @@ import sys
 import os
 import numpy as np
 import tensorflow as tf
-from matplotlib import pyplot as plt
+
 from PIL import Image
 from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
@@ -38,7 +38,7 @@ categories = label_map_util.convert_label_map_to_categories(label_map, max_num_c
                                                             use_display_name=True)
 category_index = label_map_util.create_category_index(categories)
 
-def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r, local_ip, img_to_color):
+def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r, img_to_color):
     # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
     image_np_expanded = np.expand_dims(image_np, axis=0)
     image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
@@ -60,6 +60,8 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
     img_height = image_np.shape[0]
     img_width = image_np.shape[1]
 
+    min_score_thresh = 0.5
+
     track_boxes = []
     track_objs = []
     person_ids = []
@@ -68,7 +70,7 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
     person_scores = []
     person_classes = []
     for p_id in _person_ids:
-        if scores[0][p_id] > 0.1:
+        if scores[0][p_id] > min_score_thresh:
             person_ids.append(p_id)
             person_box = boxes[0][p_id]
             person_boxes.append(person_box)
@@ -96,11 +98,11 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
     
     # trackers = mot_tracker.update(np.asarray(track_boxes))
     trackers = deep_tracker.track(track_objs, image_np)
-    print("trackers: ", trackers)
-    print("person ids", person_ids)
+    # print("trackers: ", trackers)
+    # print("person ids", person_ids)
     if len(trackers) > 0 and len(trackers) == len(person_ids):
         # 북서남동
-
+        print("person ids", person_ids)
         # print(person_tracker[4])
         def crop_img(img,box):
             y,x,d = img.shape
@@ -143,7 +145,8 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
         person_boxes = np.asarray(person_boxes)
         person_scores = np.asarray(person_scores)
         person_classes = np.asarray(person_classes)
-        # print("tracker",trackers)
+        print("tracker",trackers)
+        # if len(trackers) == len(person_ids):
         # print(person_boxes.shape, person_scores.shape, person_classes.shape, trackers.shape)
         # Visualization of the results of a detection.
         vis_util.visualize_boxes_and_labels_on_image_array(
@@ -155,9 +158,10 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
             person_attrs,
             category_index,
             use_normalized_coordinates=True,
-            line_thickness=3)
+            line_thickness=3,
+            min_score_thresh=min_score_thresh)
 
-    return image_np
+    return image_np, trackers
 
 # First test on images
 PATH_TO_TEST_IMAGES_DIR = 'object_detection/test_images'
@@ -182,7 +186,7 @@ with detection_graph.as_default():
 import cv2
 import time
 
-CAM_ID = 0
+CAM_ID = 1
 cam = cv2.VideoCapture(CAM_ID)
 
 if cam.isOpened() == False:
@@ -192,8 +196,6 @@ if cam.isOpened() == False:
 cv2.namedWindow('Cam')
 prevTime = 0
 
-# ''' Getting Local IP of this Computer '''
-local_ip = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0]
 
 # ips = eval(r.hget('subscribers','list'))
 # if ips is None:
@@ -210,6 +212,10 @@ local_ip = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not
 
 # atexit.register(unset_redis_at_exit,r=r,local_ip=local_ip)
 
+import socket
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect(("192.168.0.23", 8250))
+
 with detection_graph.as_default():
     with tf.Session(graph=detection_graph) as sess:
         # Load modules
@@ -223,7 +229,50 @@ with detection_graph.as_default():
             ret, frame = cam.read()
             
             # Detection
-            image_process = detect_objects(frame, sess, detection_graph, mot_tracker, deep_tracker, r, local_ip, img_to_color)
+            image_process, track_results = detect_objects(frame, sess, detection_graph, mot_tracker, deep_tracker, r, img_to_color)
+
+            if len(track_results) > 0:
+                _s = 0
+                target = None
+                for _t in track_results:
+                    _size = _t['bottomright']['x'] - _t['topleft']['x']
+
+                    if _size > _s:
+                        target = _t
+                        _s = _size
+
+                if target is not None:
+                    _c = frame.shape[1] / 2
+                    center = ( target['bottomright']['x'] + target['topleft']['x'] ) / 2
+                    '''
+                    1. 타겟 크기가 일정 크기보다 크면 좌우를 찾기 힘들기 때문에 일정 크기 이상일 시 정지하는게 좋아보임.
+                    2. 타켓 센터와 뷰 센터의 거리가 멀면 더 빠르게 이동할 것
+                    3. 바운더리 바깥에서 접근할 시(센서값으로 바운더리인지 확인), 처음부터 빠르게 이동할 필요가 있음.
+                    '''
+                    if _c >= center * 1.12:
+                        # 0012STX101111ETX
+                        
+                        data = '0012STX011011ETX'
+
+                        if data != '':
+                            client_socket.send(data.encode())
+                        
+                    elif _c <= center * 0.88:
+                        data = '0012STX101011ETX'
+
+                        if data != '':
+                            client_socket.send(data.encode())
+
+                    else:
+                        data = '0012STX110000ETX'
+
+                        if data != '':
+                            client_socket.send(data.encode())
+
+                    print(data)
+                    data = ''
+
+
 
             curTime = time.time()
             sec = curTime - prevTime
