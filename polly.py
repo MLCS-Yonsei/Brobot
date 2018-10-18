@@ -10,8 +10,8 @@ def play_with_polly(text):
     # Create a client using the credentials and region defined in the [adminuser]
     # section of the AWS credentials file (~/.aws/credentials).
     settings = {
-        'AWS_SERVER_PUBLIC_KEY':'AKIAJEKC4NXJP2RU65TQ',
-        'AWS_SERVER_SECRET_KEY':'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'
+        'AWS_SERVER_PUBLIC_KEY':'AKIAIZXM5FUGXZ3PLRLQ',
+        'AWS_SERVER_SECRET_KEY':''
     }
 
     session = Session(
