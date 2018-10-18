@@ -10,12 +10,16 @@ from mutagen.mp3 import MP3
 from math import ceil
 from time import sleep
 
+import json
+with open('./AWS_key.json') as f:
+    aws_key = json.load(f)
+
 def play_with_polly(text):
     # Create a client using the credentials and region defined in the [adminuser]
     # section of the AWS credentials file (~/.aws/credentials).
     settings = {
-        'AWS_SERVER_PUBLIC_KEY':'AKIAIZXM5FUGXZ3PLRLQ',
-        'AWS_SERVER_SECRET_KEY':''
+        'AWS_SERVER_PUBLIC_KEY':aws_key['AWS_SERVER_PUBLIC_KEY'],
+        'AWS_SERVER_SECRET_KEY':aws_key['AWS_SERVER_SECRET_KEY']
     }
 
     session = Session(
