@@ -59,15 +59,18 @@ def play_with_polly(text):
 
     # Play the audio using the platform's default player
     if sys.platform == "win32":
-        os.startfile(output)
+        # os.startfile(output)
+        return output
     else:
         # the following works on Mac and Linux. (Darwin = mac, xdg-open = linux).
         opener = "open" if sys.platform == "darwin" else "xdg-open"
         subprocess.call([opener, output])
+        return False
 
-    audio = MP3(output)
-    _play_time = ceil(audio.info.length)
-    sleep(_play_time)
+    # audio = MP3(output)
+    # _play_time = ceil(audio.info.length)
+    # sleep(_play_time)
 
-r = play_with_polly("빨간 옷이 참 잘어울리시네요")
-print("Play time : ", r)
+if __name__ == '__main__':
+    r = play_with_polly("빨간 옷이 참 잘어울리시네요")
+    print("Play time : ", r)
