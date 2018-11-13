@@ -631,7 +631,10 @@ def visualize_boxes_and_labels_on_image_array(
             display_str = '{}%'.format(int(100*scores[i]))
           else:
             if attrs is not None:
-              display_str = '{}: {}% [Gender:{},Age:{},Cloth Color:{},Track ID:{}]'.format(display_str, int(100*scores[i]), attrs[i]['gender'], attrs[i]['age'], attrs[i]['color'], int(track_ids[i]['label']))
+              if track_ids != []:
+                display_str = '{}: {}% [Gender:{},Age:{},Cloth Color:{},Track ID:{}]'.format(display_str, int(100*scores[i]), attrs[i]['gender'], attrs[i]['age'], attrs[i]['color'], int(track_ids[i]['label']))
+              else:
+                display_str = '{}: {}% [Gender:{},Age:{},Cloth Color:{},Track ID:{}]'.format(display_str, int(100*scores[i]), attrs[i]['gender'], attrs[i]['age'], attrs[i]['color'], 'NA'))
             else:
               display_str = '{}: {}%'.format(display_str, int(100*scores[i]))
         box_to_display_str_map[box].append(display_str)

@@ -99,69 +99,71 @@ def detect_objects(image_np, sess, detection_graph, mot_tracker, deep_tracker, r
             track_objs.append(_track_obj)
     
     # trackers = mot_tracker.update(np.asarray(track_boxes))
-    trackers = deep_tracker.track(track_objs, image_np)
+    # trackers = deep_tracker.track(track_objs, image_np)
     # print("trackers: ", trackers)
     # print("person ids", person_ids)
-    if len(trackers) > 0 and len(trackers) == len(person_ids):
+    # if len(trackers) > 0 and len(trackers) == len(person_ids):
         # 북서남동
-        # print("person ids", person_ids)
-        # print(person_tracker[4])
-        def crop_img(img,box):
-            y,x,d = img.shape
-            startx = int(x*box[0])
-            starty = int(y*box[1])
-            endx = int(x*box[3])
-            endy = int(y*box[2])
+    # print("person ids", person_ids)
+    # print(person_tracker[4])
 
-            return img[starty:endy,startx:endx]
+    trackers = []
+    def crop_img(img,box):
+        y,x,d = img.shape
+        startx = int(x*box[0])
+        starty = int(y*box[1])
+        endx = int(x*box[3])
+        endy = int(y*box[2])
 
-        person_attrs = []
-        for idx, person_id in enumerate(person_ids):
-            try:
-                person_box = person_boxes[idx]
+        return img[starty:endy,startx:endx]
 
-                person_img = crop_img(image_np,person_box)
-                c = img_to_color.get(person_img)
-            except:
-                c = 'NA'
-            
+    person_attrs = []
+    for idx, person_id in enumerate(person_ids):
+        try:
+            person_box = person_boxes[idx]
 
-            person_attr = {
-                'age':1,
-                'gender':1,
-                'color':c
-            }
-            
-            person_attrs.append(person_attr)
-
-        # start_time = time.time()
-
-        # elapsed_time = time.time() - start_time
-        # print("ET",elapsed_time)
-        
-        # for r in results:
-        #     person_attr[r['flag']] = r['value']
+            person_img = crop_img(image_np,person_box)
+            c = img_to_color.get(person_img)
+        except:
+            c = 'NA'
         
 
-        # override boxes
-        person_boxes = np.asarray(person_boxes)
-        person_scores = np.asarray(person_scores)
-        person_classes = np.asarray(person_classes)
-        # print("tracker",trackers)
-        # if len(trackers) == len(person_ids):
-        # print(person_boxes.shape, person_scores.shape, person_classes.shape, trackers.shape)
-        # Visualization of the results of a detection.
-        vis_util.visualize_boxes_and_labels_on_image_array(
-            image_np,
-            person_boxes,
-            person_classes,
-            person_scores,
-            trackers,
-            person_attrs,
-            category_index,
-            use_normalized_coordinates=True,
-            line_thickness=3,
-            min_score_thresh=min_score_thresh)
+        person_attr = {
+            'age':1,
+            'gender':1,
+            'color':c
+        }
+        
+        person_attrs.append(person_attr)
+
+    # start_time = time.time()
+
+    # elapsed_time = time.time() - start_time
+    # print("ET",elapsed_time)
+    
+    # for r in results:
+    #     person_attr[r['flag']] = r['value']
+    
+
+    # override boxes
+    person_boxes = np.asarray(person_boxes)
+    person_scores = np.asarray(person_scores)
+    person_classes = np.asarray(person_classes)
+    # print("tracker",trackers)
+    # if len(trackers) == len(person_ids):
+    # print(person_boxes.shape, person_scores.shape, person_classes.shape, trackers.shape)
+    # Visualization of the results of a detection.
+    vis_util.visualize_boxes_and_labels_on_image_array(
+        image_np,
+        person_boxes,
+        person_classes,
+        person_scores,
+        trackers,
+        person_attrs,
+        category_index,
+        use_normalized_coordinates=True,
+        line_thickness=3,
+        min_score_thresh=min_score_thresh)
 
     return image_np, trackers
 
@@ -188,7 +190,7 @@ with detection_graph.as_default():
 import cv2
 import time
 
-CAM_ID = 1
+CAM_ID = 0
 cam = cv2.VideoCapture(CAM_ID)
 
 if cam.isOpened() == False:
@@ -215,9 +217,7 @@ prevTime = 0
 # atexit.register(unset_redis_at_exit,r=r,local_ip=local_ip)
 
 import socket
-robot_ip = "192.168.0.23"
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect((robot_ip, 8250))
+
 robot_movement_time = None
 _var = None
 
@@ -236,8 +236,8 @@ with detection_graph.as_default():
             # Detection
             image_process, track_results = detect_objects(frame, sess, detection_graph, mot_tracker, deep_tracker, r, img_to_color)
 
-            if len(track_results) > 0:
-                _var, robot_movement_time = robotControl(_var, robot_ip, client_socket, track_results, robot_movement_time, frame)
+            # if len(track_results) > 0:
+            #     _var, robot_movement_time = robotControl(_var, robot_ip, client_socket, track_results, robot_movement_time, frame)
 
 
 
